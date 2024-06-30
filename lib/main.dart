@@ -4,126 +4,184 @@ import 'profile_page.dart';
 import 'loading_screen.dart';
 import 'no_virus_detected_screen.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  runApp(CreedAntivirusApp());
+}
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class CreedAntivirusApp extends StatefulWidget {
+  @override
+  _CreedAntivirusAppState createState() => _CreedAntivirusAppState();
+}
+
+class _CreedAntivirusAppState extends State<CreedAntivirusApp> {
+  bool _isDarkMode = false;
+
+  void _toggleDarkMode(bool value) {
+    setState(() {
+      _isDarkMode = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '病毒清理器', // 修改标题为中文
-      home: HomeScreen(),
+      title: 'Creed AntiVirus',
+      theme: _isDarkMode ? ThemeData.dark() : ThemeData.light(),
+      home: CreedAntivirusHomePage(
+        toggleDarkMode: _toggleDarkMode,
+        isDarkMode: _isDarkMode,
+      ),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+class CreedAntivirusHomePage extends StatefulWidget {
+  final Function(bool) toggleDarkMode;
+  final bool isDarkMode;
+
+  CreedAntivirusHomePage({required this.toggleDarkMode, required this.isDarkMode});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _CreedAntivirusHomePageState createState() => _CreedAntivirusHomePageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  String scanResult = '';
+class _CreedAntivirusHomePageState extends State<CreedAntivirusHomePage> {
+  int _selectedIndex = 0;
 
-  Future<void> performSmartScan(String scanType) async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://192.168.100.17:8080/api/smart-scan?scanType=$scanType'),
-      );
-
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        setState(() {
-          scanResult = result['message'];
-        });
-      } else {
-        throw Exception('智能扫描失败'); // 修改异常消息为中文
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('异常: $e'); // 修改调试信息为中文
-      }
-      setState(() {
-        scanResult = '错误: $e'; // 修改错误消息为中文
-      });
-    }
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
-  Future<void> performUrlScan(String url) async {
-    try {
-      final response = await http.post(
-        Uri.parse('http://192.168.100.17:8080/api/url-scan'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{'url': url}),
-      );
+  void _startScan(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoadingScreen(),
+      ),
+    );
 
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        setState(() {
-          scanResult = result['message'];
-        });
-      } else {
-        throw Exception('URL扫描失败'); // 修改异常消息为中文
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('异常: $e'); // 修改调试信息为中文
-      }
-      setState(() {
-        scanResult = '错误: $e'; // 修改错误消息为中文
-      });
-    }
+    Future.delayed(Duration(seconds: 2), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NoVirusDetectedScreen(),
+        ),
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> _pages = <Widget>[
+      HomePageContent(
+        isDarkMode: widget.isDarkMode,
+        startScan: () => _startScan(context),
+      ),
+      ProfilePage(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('病毒清理器'), // 修改标题为中文
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Antivirus',
+                textAlign: TextAlign.left,
+              ),
+            ),
+          ],
+        ),
         actions: [
+          if (!widget.isDarkMode)
+            TextButton(
+              onPressed: () {
+                // Upgrade button action
+              },
+              child: Text(
+                'Upgrade',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
           IconButton(
             icon: Icon(Icons.settings),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => SettingsPage(
+                    toggleDarkMode: widget.toggleDarkMode,
+                    isDarkMode: widget.isDarkMode,
+                  ),
+                ),
               );
             },
           ),
         ],
       ),
-      body: Center(
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.blue,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+}
+
+class HomePageContent extends StatelessWidget {
+  final bool isDarkMode;
+  final VoidCallback startScan;
+
+  HomePageContent({required this.isDarkMode, required this.startScan});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Colors.grey,
+              width: 1.0,
+            ),
+            bottom: BorderSide(
+              color: Colors.grey,
+              width: 1.0,
+            ),
+          ),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ScanScreen()),
-                );
-              },
-              child: Text('智能扫描'), // 修改按钮文本为中文
+          children: [
+            CircleAvatar(
+              radius: 80.0,
+              backgroundColor: isDarkMode ? Colors.white : Colors.black,
+              child: TextButton(
+                onPressed: startScan,
+                child: Text(
+                  'Scan',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.black : Colors.white,
+                    fontSize: 18.0,
+                  ),
+                ),
+              ),
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const UrlScanScreen()),
-                );
-              },
-              child: Text('URL扫描'), // 修改按钮文本为中文
-            ),
-            SizedBox(height: 20),
-            Text(
-              scanResult.isNotEmpty ? '扫描结果: $scanResult' : '', // 修改显示文本为中文
-              style: TextStyle(fontSize: 16),
-            ),
+            SizedBox(height: 10.0),
+            Text('Scan to detect malware'),
           ],
         ),
       ),
